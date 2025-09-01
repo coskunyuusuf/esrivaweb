@@ -1,947 +1,1304 @@
-// Matrix Rain Effect - Reusable Component
-function createMatrixEffect(container, options = {}) {
-    if (!container) {
-        console.warn('Matrix effect: Container not found');
-        return;
-    }
-    
-    const {
-        fontSize = 16,
-        color = '#0F0',
-        opacity = 0.7,
-        speed = 50,
-        letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789@#$%^&*()*&^%'.split(''),
-        clipToCircle = false,
-        onSpeedChange = null,
-        variant = 'default',
-        isFloating = false
-    } = options;
-    
-    // Footer-specific configuration
-    const footerConfig = {
-        fontSize: Math.max(10, fontSize * 0.8),
-        opacity: Math.max(0.1, opacity * 0.6),
-        particleDensity: 0.35, // 35% of normal density
-        spawnRate: 0.5, // 50% spawn rate
-        maxActiveParticles: 250,
-        connectionDistance: 0.7, // 70% of normal
-        trailLength: 0.8, // 80% of normal
-        lineWidth: 0.9, // 90% of normal
-        useRequestAnimationFrame: true
-    };
-    
-    // Apply footer config if variant is footer
-    const config = variant === 'footer' ? { ...options, ...footerConfig } : options;
-    
-    // Clear previous content
-    container.innerHTML = '';
-    
-    const canvas = document.createElement('canvas');
-    container.appendChild(canvas);
-    
-    // Performance optimization: check if tab is visible
-    let isTabVisible = !document.hidden;
-    
-    // Set canvas size
-    function resizeCanvas() {
-        canvas.width = container.offsetWidth;
-        canvas.height = container.offsetHeight;
+// ============================================================================
+// MATRIX EFFECT SYSTEM
+// ============================================================================
+
+class MatrixEffect {
+    constructor(container, options = {}) {
+        if (!container) return;
         
-        // Ensure canvas doesn't exceed container bounds
-        canvas.style.maxWidth = '100%';
-        canvas.style.maxHeight = '100%';
-        canvas.style.width = '100%';
-        canvas.style.height = '100%';
-    }
-    
-    resizeCanvas();
-    const ctx = canvas.getContext('2d');
-    
-    // Performance optimization: early return if tab is hidden
-    if (!isTabVisible) {
-        return {
-            cleanup: () => {},
-            changeSpeed: () => {}
+        this.container = container;
+        this.options = {
+            fontSize: 16,
+            color: '#00ff88',
+            speed: 50,
+            opacity: 0.7,
+            letters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789'.split(''),
+            ...options
         };
+        
+        this.isVisible = !document.hidden;
+        this.animationId = null;
+        this.lastTime = 0;
+        
+        this.init();
     }
     
-    // Apply clipping if needed
-    if (clipToCircle) {
-        const radius = Math.min(canvas.width, canvas.height) / 2;
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-        ctx.clip();
+    init() {
+        this.createCanvas();
+        this.setupEventListeners();
+        this.start();
     }
     
-    // Calculate particle density based on variant
-    const baseColumns = canvas.width / config.fontSize;
-    const actualColumns = Math.floor(baseColumns * (config.particleDensity || 1));
-    const drops = Array(actualColumns).fill(1);
-    
-    // Footer-specific optimizations
-    const spawnThreshold = config.spawnRate || 1;
-    const maxParticles = config.maxActiveParticles || Infinity;
-
-    function draw() {
-        // Performance optimization: skip if tab is hidden
-        if (!isTabVisible) return;
-        
-        // Apply clipping if needed
-        if (clipToCircle) {
-            const radius = Math.min(canvas.width, canvas.height) / 2;
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-            ctx.clip();
-        }
-        
-        // Use a more efficient fade effect
-        const fadeAlpha = config.variant === 'footer' ? 0.12 : 0.08;
-        ctx.fillStyle = `rgba(0, 0, 0, ${fadeAlpha})`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        ctx.fillStyle = config.color || color;
-        ctx.font = `${config.fontSize}px monospace`;
-
-        // Optimize the loop for better performance
-        let activeParticles = 0;
-        for (let i = 0; i < drops.length; i++) {
-            // Footer optimization: limit active particles
-            if (config.variant === 'footer' && activeParticles >= maxParticles) {
-                break;
-            }
-            
-            const text = letters[Math.floor(Math.random() * letters.length)];
-            const x = i * (canvas.width / drops.length);
-            const y = drops[i] * config.fontSize;
-            
-            // Strict boundary checking - only draw if within canvas bounds
-            if (y >= 0 && y < canvas.height && x >= 0 && x < canvas.width && Math.random() < spawnThreshold) {
-                ctx.fillText(text, x, y);
-                activeParticles++;
-            }
-
-            if (drops[i] * config.fontSize > canvas.height && Math.random() > 0.975) {
-                drops[i] = 0;
-            }
-            drops[i]++;
-        }
-        
-        // Restore context if clipping was applied
-        if (clipToCircle) {
-            ctx.restore();
-        }
-    }
-
-    let currentSpeed = config.speed || speed;
-    let lastTime = 0;
-    
-    // Use requestAnimationFrame for footer variant, setInterval for others
-    const useRAF = config.useRequestAnimationFrame || config.variant === 'footer';
-    
-    let interval = null;
-    let animationId = null;
-    
-    // Function to change speed dynamically
-    const changeSpeed = (newSpeed) => {
-        if (newSpeed !== currentSpeed) {
-            currentSpeed = newSpeed;
-            if (useRAF) {
-                // RAF doesn't need speed changes, but we can adjust timing
-                lastTime = 0;
-            } else {
-                clearInterval(interval);
-                interval = setInterval(draw, currentSpeed);
-            }
-        }
-    };
-    
-    // Animation loop for requestAnimationFrame
-    const animate = (timestamp) => {
-        if (!isTabVisible) return;
-        
-        if (timestamp - lastTime >= currentSpeed) {
-            draw();
-            lastTime = timestamp;
-        }
-        
-        animationId = requestAnimationFrame(animate);
-    };
-
-    // Start animation based on variant
-    if (useRAF) {
-        animationId = requestAnimationFrame(animate);
-    } else {
-        interval = setInterval(draw, currentSpeed);
+    createCanvas() {
+        this.container.innerHTML = '';
+        this.canvas = document.createElement('canvas');
+        this.container.appendChild(this.canvas);
+        this.ctx = this.canvas.getContext('2d');
+        this.resize();
     }
     
-    // Canvas resize handling
-    const resizeHandler = () => {
-        resizeCanvas();
-        if (clipToCircle) {
-            const radius = Math.min(canvas.width, canvas.height) / 2;
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
+    resize() {
+        this.canvas.width = this.container.offsetWidth;
+        this.canvas.height = this.container.offsetHeight;
+        this.canvas.style.cssText = 'width:100%;height:100%;max-width:100%;max-height:100%';
+        
+        this.columns = Math.floor(this.canvas.width / this.options.fontSize);
+        this.drops = Array(this.columns).fill(1);
+    }
+    
+    draw() {
+        if (!this.isVisible) return;
+        
+        // Fade effect
+        this.ctx.fillStyle = `rgba(0, 0, 0, 0.08)`;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        this.ctx.fillStyle = this.options.color;
+        this.ctx.font = `${this.options.fontSize}px monospace`;
+        
+        for (let i = 0; i < this.drops.length; i++) {
+            const text = this.options.letters[Math.floor(Math.random() * this.options.letters.length)];
+            const x = i * this.options.fontSize;
+            const y = this.drops[i] * this.options.fontSize;
             
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-            ctx.clip();
+            if (y >= 0 && y < this.canvas.height) {
+                this.ctx.fillText(text, x, y);
+            }
+            
+            if (y > this.canvas.height && Math.random() > 0.975) {
+                this.drops[i] = 0;
+            }
+            this.drops[i]++;
         }
-    };
+    }
     
-    // Use passive event listener for better performance
-    window.addEventListener('resize', resizeHandler, { passive: true });
+    animate(timestamp) {
+        if (timestamp - this.lastTime >= this.options.speed) {
+            this.draw();
+            this.lastTime = timestamp;
+        }
+        this.animationId = requestAnimationFrame(this.animate.bind(this));
+    }
     
-    // Visibility change handler
-    const visibilityHandler = () => {
-        isTabVisible = !document.hidden;
-    };
-    document.addEventListener('visibilitychange', visibilityHandler, { passive: true });
+    start() {
+        this.animationId = requestAnimationFrame(this.animate.bind(this));
+    }
     
-    // Return cleanup function and speed change function
-    return {
-        cleanup: () => {
-            if (interval) clearInterval(interval);
-            if (animationId) cancelAnimationFrame(animationId);
+    stop() {
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+        }
+    }
+    
+    changeSpeed(newSpeed) {
+        this.options.speed = newSpeed;
+    }
+    
+    setupEventListeners() {
+        const resizeHandler = () => this.resize();
+        const visibilityHandler = () => this.isVisible = !document.hidden;
+        
+        window.addEventListener('resize', resizeHandler, { passive: true });
+        document.addEventListener('visibilitychange', visibilityHandler, { passive: true });
+        
+        this.cleanup = () => {
             window.removeEventListener('resize', resizeHandler);
             document.removeEventListener('visibilitychange', visibilityHandler);
-        },
-        changeSpeed: changeSpeed
-    };
+        };
+    }
+    
+    destroy() {
+        this.stop();
+        if (this.cleanup) this.cleanup();
+    }
 }
 
-// Matrix Rain Effect (Legacy function for backward compatibility)
-function createMatrixRain() {
-    const matrixBg = document.getElementById('matrixBg');
-    if (!matrixBg) return;
+// ============================================================================
+// API DATA LOADING & RENDERING
+// ============================================================================
+
+class DataManager {
+    static async loadServices() {
+        console.log('Loading services...');
+        // Statik hizmetler yükleniyor
+        const staticServices = [
+            {
+                id: 1,
+                title: "Web Geliştirme",
+                description: "Modern ve responsive web siteleri, e-ticaret platformları ve web uygulamaları geliştiriyoruz.",
+                category: "web",
+                image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=500&h=300&fit=crop"
+            },
+            {
+                id: 2,
+                title: "Mobil Uygulama",
+                description: "iOS ve Android için native ve cross-platform mobil uygulamalar geliştiriyoruz.",
+                category: "mobile",
+                image: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=500&h=300&fit=crop"
+            },
+            {
+                id: 3,
+                title: "UI/UX Tasarım",
+                description: "Kullanıcı deneyimi odaklı modern ve estetik tasarım çözümleri sunuyoruz.",
+                category: "design",
+                image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=500&h=300&fit=crop"
+            },
+            {
+                id: 4,
+                title: "Dijital Pazarlama",
+                description: "SEO, SEM, sosyal medya yönetimi ve içerik pazarlama hizmetleri veriyoruz.",
+                category: "marketing",
+                image: "https://images.unsplash.com/photo-1557838923-2985c318be48?w=500&h=300&fit=crop"
+            },
+            {
+                id: 5,
+                title: "Sistem Entegrasyonu",
+                description: "Mevcut sistemlerinizi entegre ederek verimliliğinizi artırıyoruz.",
+                category: "integration",
+                image: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=500&h=300&fit=crop"
+            },
+            {
+                id: 6,
+                title: "Teknik Danışmanlık",
+                description: "Dijital dönüşüm sürecinizde teknik danışmanlık ve strateji hizmetleri.",
+                category: "consulting",
+                image: "https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=500&h=300&fit=crop"
+            }
+        ];
+        this.renderServices(staticServices);
+    }
     
-    const chars = '01アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソトノホモヨョロヲゴゾドボポヴッン0123456789';
+    static async loadAbout() {
+        // Statik about verisiyle çalış
+        const staticAbout = {
+            title: "ESRiVA Yazılım Ajansı",
+            subtitle: "Teknoloji ile geleceği şekillendiriyoruz",
+            description: "2015 yılından bu yana dijital dünyada markaların başarısı için çalışıyoruz. Modern teknolojiler ve yaratıcı çözümlerle işletmenizi dijital dönüşüm yolculuğunda destekliyoruz.",
+            features: [
+                {
+                    icon: "fas fa-code",
+                    title: "Web Geliştirme",
+                    description: "Modern ve responsive web siteleri"
+                },
+                {
+                    icon: "fas fa-mobile-alt",
+                    title: "Mobil Uygulama",
+                    description: "iOS ve Android uygulamaları"
+                },
+                {
+                    icon: "fas fa-paint-brush",
+                    title: "UI/UX Tasarım",
+                    description: "Kullanıcı odaklı tasarım"
+                }
+            ]
+        };
+        this.renderAbout(staticAbout);
+    }
+
+    static async loadTeam() {
+        // Statik ekip verileriyle çalış
+        const staticTeam = [
+            {
+                id: 1,
+                name: "Emre Kılıç",
+                role: "Koordinatör",
+                photo: "https://media.licdn.com/dms/image/v2/D4E03AQE5Wve0_0jmTA/profile-displayphoto-shrink_400_400/profile-displayphoto-shrink_400_400/0/1715716278769?e=1758758400&v=beta&t=93pfmOSplHvkgVKwuyFHE-oxVSO-No8T896NRbV3Bfo",
+                linkedin: "https://linkedin.com/in/emrekilic",
+                email: "emre@esriva.com.tr",
+                gender: "men"
+            },
+            {
+                id: 2,
+                name: "Esra Çufadaroğlu",
+                role: "Yönetim, Satış, Pazarlama",
+                photo: "https://media.licdn.com/dms/image/v2/D4D03AQE6JPqxsfkTsw/profile-displayphoto-scale_400_400/B4DZjYSDTWGkAk-/0/1755975269005?e=1758758400&v=beta&t=9MC-n6ngYnQI3Qwp3lbCJObZuQBOBgGaWrnG20Ydpkw",
+                linkedin: "https://linkedin.com/in/esracufadaroglu",
+                email: "esra@esriva.com.tr",
+                gender: "women"
+            },
+            {
+                id: 3,
+                name: "Yiğit Ataman",
+                role: "Web Developer",
+                photo: "https://media.licdn.com/dms/image/v2/D4D03AQHYtSDiegedPA/profile-displayphoto-scale_400_400/B4DZhAkz2RHAAk-/0/1753430049807?e=1758758400&v=beta&t=OyID_1YyouXWSYwtRUSh0J05ZAWP7W3yMgNLWeHdNhw",
+                linkedin: "https://linkedin.com/in/yigitataman",
+                email: "yigit@esriva.com.tr",
+                gender: "men"
+            },
+            {
+                id: 4,
+                name: "Emirhan Berber",
+                role: "Web Developer, Mobile Developer",
+                photo: "https://media.licdn.com/dms/image/v2/D4D03AQGD362E_akWxQ/profile-displayphoto-shrink_400_400/profile-displayphoto-shrink_400_400/0/1730636281894?e=1758758400&v=beta&t=4jmGAhkckaPxrT6mDsjeBuR-alO5-N58rJUh05DEO2M",
+                linkedin: "https://linkedin.com/in/emirhanberber",
+                email: "emirhan@esriva.com.tr",
+                gender: "men"
+            },
+            {
+                id: 5,
+                name: "Fatih Kaplan",
+                role: "Web Developer",
+                photo: "https://media.licdn.com/dms/image/v2/D4D03AQGyPYXM-OugsA/profile-displayphoto-scale_400_400/B4DZgjKKbpGkAg-/0/1752936524311?e=1758758400&v=beta&t=VUgCFZxroLh0Zsi-7XxdHj3CPCpeUppwm1ZgC-37Htg",
+                linkedin: "https://linkedin.com/in/fatihkaplan",
+                email: "fatih@esriva.com.tr",
+                gender: "men"
+            },
+            {
+                id: 6,
+                name: "Yusuf Coşkun",
+                role: "Frontend Developer",
+                photo: "https://media.licdn.com/dms/image/v2/D4E03AQEiQKtyvqNp5w/profile-displayphoto-scale_400_400/B4EZjc8zxZGwAk-/0/1756053587036?e=1758758400&v=beta&t=Pt0Oak7aZDfA6vvFND-_Srl6A3tKwL7IojdV9VGWie8",
+                linkedin: "https://linkedin.com/in/yusufcoskun",
+                email: "yusuf@esriva.com.tr",
+                gender: "men"
+            },
+            {
+                id: 7,
+                name: "Eren Bahadır",
+                role: "Web Developer",
+                photo: "https://media.licdn.com/dms/image/v2/D4E03AQHr-t9Kiq7UPw/profile-displayphoto-shrink_400_400/B4EZdjwJ5JHsAg-/0/1749725258427?e=1758758400&v=beta&t=YBg6SeUeLGO81Q_e7mIYPIZOpnRtoabKB1CvZ1MIKmc",
+                linkedin: "https://linkedin.com/in/erenbahadir",
+                email: "eren@esriva.com.tr",
+                gender: "men"
+            },
+            {
+                id: 8,
+                name: "Onur Emircan Sönmez",
+                role: "Web Developer",
+                photo: "https://i.imgur.com/bf2HMUZ.jpeg",
+                linkedin: "https://linkedin.com/in/onuremircansonmez",
+                email: "onur@esriva.com.tr",
+                gender: "men"
+            },
+            {
+                id: 9,
+                name: "Hanife Öztürk",
+                role: "Designer",
+                photo: "https://media.licdn.com/dms/image/v2/D4D03AQFNrdfgDA91pA/profile-displayphoto-shrink_400_400/B4DZcg4u2aGgAg-/0/1748603433361?e=1758758400&v=beta&t=BMBHkP_rry6mriChZWcPdmkWtTRoGKIkeb2TISH2NPE",
+                linkedin: "https://linkedin.com/in/hanifeozturk",
+                email: "hanife@esriva.com.tr",
+                gender: "women"
+            },
+            {
+                id: 10,
+                name: "Emre Süngü",
+                role: "Frontend Developer, Social Media Manager",
+                photo: "https://i.imgur.com/KMV187t.jpeg",
+                linkedin: "https://linkedin.com/in/emresungu",
+                email: "emre.sungu@esriva.com.tr",
+                gender: "men"
+            },
+            {
+                id: 11,
+                name: "Tuğba Alptoğa",
+                role: "Social Media Manager",
+                photo: "https://i.imgur.com/0aqDxNR.jpeg",
+                linkedin: "https://linkedin.com/in/tugbaalptoga",
+                email: "tugba@esriva.com.tr",
+                gender: "women"
+            }
+        ];
+        this.renderTeam(staticTeam);
+    }
     
-    // Clear previous content
-    matrixBg.innerHTML = '';
+    static async loadTestimonials() {
+        // Statik referanslarla çalış
+        const staticTestimonials = [
+            {
+                id: 1,
+                name: "Ahmet Yılmaz",
+                position: "CEO, TechStart",
+                company: "TechStart",
+                content: "ESRiVA ile çalışmak gerçekten harika bir deneyimdi. Profesyonel yaklaşımları ve kaliteli iş çıkarmaları sayesinde e-ticaret sitemiz %300 büyüme kaydetti. Kesinlikle tavsiye ederim!",
+                rating: 5,
+                avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80"
+            },
+            {
+                id: 2,
+                name: "Ayşe Kaya",
+                position: "Pazarlama Müdürü",
+                company: "Digital Solutions",
+                content: "Mobil uygulamamızın geliştirilmesinde ESRiVA'nın gösterdiği performans muhteşemdi. Zamanında teslim, bütçe dahilinde ve beklentilerimizin üzerinde bir sonuç aldık.",
+                rating: 5,
+                avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80"
+            },
+            {
+                id: 3,
+                name: "Mehmet Demir",
+                position: "Kurucu",
+                company: "StartupHub",
+                content: "ESRiVA'nın teknik uzmanlığı ve yaratıcı çözümleri sayesinde startup'ımız hızla büyüdü. Özellikle kullanıcı deneyimi tasarımı konusundaki yaklaşımları çok etkileyici.",
+                rating: 5,
+                avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80"
+            },
+            {
+                id: 4,
+                name: "Selin Yıldız",
+                position: "Dijital Pazarlama Uzmanı",
+                company: "Growth Marketing",
+                content: "ESRiVA'nın SEO ve dijital pazarlama stratejileri sayesinde web sitemizin organik trafiği %400 arttı. Özellikle içerik pazarlama konusundaki yaklaşımları çok başarılı.",
+                rating: 5,
+                avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80"
+            },
+            {
+                id: 5,
+                name: "Burak Kaya",
+                position: "Yazılım Geliştirici",
+                company: "CodeCraft",
+                content: "ESRiVA ile birlikte geliştirdiğimiz projelerde kullandığımız modern teknolojiler ve best practice'ler gerçekten etkileyici. Kod kalitesi ve performans optimizasyonu konusunda çok başarılılar.",
+                rating: 5,
+                avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80"
+            },
+            {
+                id: 6,
+                name: "Elif Özkan",
+                position: "UI/UX Tasarımcısı",
+                company: "Design Studio",
+                content: "ESRiVA'nın tasarım ekibi ile çalışmak gerçekten keyifli. Kullanıcı deneyimi odaklı yaklaşımları ve modern tasarım trendlerini takip etmeleri projelerimizi çok başarılı kıldı.",
+                rating: 5,
+                avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80"
+            }
+        ];
+        this.renderTestimonials(staticTestimonials);
+    }
     
-    const containerWidth = window.innerWidth;
-    const columnWidth = 20;
-    const numColumns = Math.floor(containerWidth / columnWidth);
+    static async loadPartners() {
+        // Statik verilerle çalış
+        const staticPartners = [
+            {
+                id: 1,
+                name: "Turhost",
+                logo: "https://www.turhost.com/logo-set/JPEG/logo_turhost-logo.jpg"
+            },
+            {
+                id: 2,
+                name: "Microsoft",
+                logo: "https://cdn-dynmedia-1.microsoft.com/is/image/microsoftcorp/RWCZER-Legal-IP-Trademarks-CP-MS-logo-740x417-1?wid=406&hei=230&fit=crop&resSharp=1"
+            },
+            {
+                id: 3,
+                name: ".NET",
+                logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Microsoft_.NET_logo.svg/2048px-Microsoft_.NET_logo.svg.png"
+            },
+            {
+                id: 4,
+                name: "Microsoft SQL Server",
+                logo: "https://thumbs.dreamstime.com/b/logo-icon-vector-logos-logo-icons-set-social-media-flat-banner-vectors-svg-eps-jpg-jpeg-emblem-wallpaper-background-editorial-208329569.jpg"
+            },
+            {
+                id: 5,
+                name: "Flutter",
+                logo: "https://logosandtypes.com/wp-content/uploads/2021/04/Flutter.png"
+            }
+        ];
+        this.renderPartners(staticPartners);
+    }
     
-    for (let i = 0; i < numColumns; i++) {
-        const column = document.createElement('div');
-        column.className = 'matrix-column';
-        column.style.left = i * columnWidth + 'px';
-        column.style.animationDuration = (Math.random() * 3 + 2) + 's';
-        column.style.animationDelay = Math.random() * 2 + 's';
+    static renderAbout(aboutData) {
+        const titleElement = document.querySelector('#about .section-header h2');
+        const subtitleElement = document.querySelector('#about .section-header p');
+        const descriptionElement = document.querySelector('#about .about-text h3');
+        const contentElement = document.querySelector('#about .about-text p');
+        const featuresContainer = document.querySelector('#about .about-features');
         
-        let columnText = '';
-        const columnHeight = Math.floor(Math.random() * 30) + 10;
+        if (titleElement) titleElement.textContent = aboutData.title || 'Hakkımızda';
+        if (subtitleElement) subtitleElement.textContent = aboutData.subtitle || 'Teknoloji ile geleceği şekillendiriyoruz';
+        if (descriptionElement) descriptionElement.textContent = aboutData.title || 'ESRiVA Yazılım Ajansı';
+        if (contentElement) contentElement.textContent = aboutData.description || '2015 yılından bu yana dijital dünyada markaların başarısı için çalışıyoruz.';
         
-        for (let j = 0; j < columnHeight; j++) {
-            columnText += chars.charAt(Math.floor(Math.random() * chars.length)) + '<br>';
+        if (featuresContainer && aboutData.features) {
+            featuresContainer.innerHTML = aboutData.features.map(feature => `
+                <div class="feature">
+                    <i class="${feature.icon}"></i>
+                    <h4>${feature.title}</h4>
+                    <p>${feature.description}</p>
+                </div>
+            `).join('');
+        }
+    }
+    
+    static renderServices(services) {
+        console.log('Rendering services:', services);
+        const container = document.getElementById('services-grid');
+        if (!container) {
+            console.error('services-grid container not found!');
+            return;
         }
         
-        column.innerHTML = columnText;
-        matrixBg.appendChild(column);
+        container.innerHTML = services.map((service, index) => `
+            <a href="javascript:void(0)" 
+               class="project-card project-${service.category || 'general'}" 
+               data-service-id="${service.id}"
+               aria-label="${service.title} hizmeti">
+                <div class="project-image">
+                    <div class="matrix-bg" id="matrixBgProject${index + 1}"></div>
+                    <img class="project-photo" src="${service.image || 'https://i.hizliresim.com/crbhiuk.png'}" alt="${service.title}">
+                    <div class="project-overlay"></div>
+                </div>
+                <div class="project-content">
+                    <h3>${service.title}</h3>
+                    <p>${service.description}</p>
+                </div>
+            </a>
+        `).join('');
+        
+        MatrixManager.initProjectEffects();
+        
+        // Hizmetler render edildikten sonra RelatedProjectsManager'ı başlat
+        RelatedProjectsManager.init();
+    }
+    
+    static renderTeam(team) {
+        const container = document.getElementById('team-slider');
+        if (!container) return;
+        
+        // Backend'den gelen tüm üyeleri göster
+        const allMembers = team;
+        
+        container.innerHTML = allMembers.map(member => `
+            <div class="team-slide" data-name="${member.name}">
+                <div class="team-member">
+                    <div class="member-image">
+                        <img src="${member.photo || `https://randomuser.me/api/portraits/${member.gender || 'men'}/${Math.floor(Math.random() * 99)}.jpg`}" alt="${member.name}">
+                    </div>
+                    <div class="member-info">
+                        <h3>${member.name}</h3>
+                        <div class="member-role-badge">${member.role}</div>
+                        <div class="member-social">
+                            ${member.linkedin ? `<a href="${member.linkedin}" class="social-icon" target="_blank"><i class="fab fa-linkedin"></i></a>` : ''}
+                            ${member.email ? `<a href="mailto:${member.email}" class="social-icon"><i class="fas fa-envelope"></i></a>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        CarouselManager.initTeamCarousel();
+    }
+    
+    static renderTestimonials(testimonials) {
+        const container = document.getElementById('testimonials-slider');
+        if (!container) return;
+        
+        console.log('Rendering testimonials:', testimonials.length, testimonials);
+        
+        container.innerHTML = testimonials.map(testimonial => `
+            <div class="testimonial-slide">
+                <div class="testimonial">
+                    <div class="testimonial-content">
+                        <p>"${testimonial.content || testimonial.quote}"</p>
+                        <div class="testimonial-author">
+                            <img src="${testimonial.avatar || testimonial.author?.photo || `https://randomuser.me/api/portraits/${testimonial.author?.gender || 'men'}/${Math.floor(Math.random() * 99)}.jpg`}" alt="${testimonial.name || testimonial.author?.name}" class="customer-photo">
+                            <div class="author-info">
+                                <h4>${testimonial.name || testimonial.author?.name}</h4>
+                                <span>${testimonial.position || testimonial.author?.role}${testimonial.company ? `, ${testimonial.company}` : ''}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        console.log('Testimonials rendered, total slides:', document.querySelectorAll('.testimonial-slide').length);
+        
+        CarouselManager.initTestimonialsCarousel();
+    }
+    
+    static renderPartners(partners) {
+        const container = document.getElementById('partners-grid');
+        if (!container) return;
+        
+        container.innerHTML = partners.map(partner => `
+            <div class="partner-logo" title="${partner.name}">
+                <img src="${partner.logo}" alt="${partner.name} Logosu">
+            </div>
+        `).join('');
+    }
+    
+    static showError(containerId, message) {
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.innerHTML = `
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>${message}</p>
+                    <button onclick="location.reload()" class="btn btn-primary">Tekrar Dene</button>
+                </div>
+            `;
+        }
     }
 }
 
-// Legacy function for backward compatibility
-function startMatrixAnimation(container) {
-    if (!container) return;
-    createMatrixEffect(container);
-}
+// ============================================================================
+// MATRIX EFFECTS MANAGER
+// ============================================================================
 
-// Initialize all matrix effects
-function initializeMatrixEffects() {
-    console.log('Initializing matrix effects...');
+class MatrixManager {
+    static effects = {};
     
-    // Store matrix effect instances for later use
-    window.matrixEffects = {
-        hero: null,
-        footer: null,
-        rocket: null
-    };
-    
-    // Hero animasyonu
-    const heroMatrix = document.getElementById('matrixBg');
-    if (heroMatrix) {
-        console.log('Creating hero matrix effect');
-        window.matrixEffects.hero = createMatrixEffect(heroMatrix, {
-            fontSize: 16,
-            color: '#0F0',
-            speed: 50
-        });
-    } else {
-        console.warn('Hero matrix container not found');
+    static init() {
+        this.initHeroEffect();
+        this.initFooterEffect();
+        this.initVideoEffect();
     }
-
-    // Footer animasyonu - optimized for performance
-    const footerMatrix = document.getElementById('matrixBgFooter');
-    if (footerMatrix) {
-        console.log('Creating footer matrix effect');
-        window.matrixEffects.footer = createMatrixEffect(footerMatrix, {
-            variant: 'footer',
-            fontSize: 14,
-            color: '#00ff88',
-            speed: 60, // Same speed as hero for smooth motion
-            opacity: 0.4,
-            letters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789'.split('')
-        });
-    } else {
-        console.warn('Footer matrix container not found');
-    }
-
-
-
-    // Project cards matrix effects (always visible)
-    const projectMatrices = [
-        document.getElementById('matrixBgProject1'),
-        document.getElementById('matrixBgProject2'),
-        document.getElementById('matrixBgProject3')
-    ];
     
-    projectMatrices.forEach((matrix, index) => {
-        if (matrix) {
-            console.log(`Creating project ${index + 1} matrix effect`);
-            window.matrixEffects[`project${index + 1}`] = createMatrixEffect(matrix, {
-                variant: 'footer', // Use footer-optimized settings
-                fontSize: 10,
-                color: '#ffffff',
-                speed: 60, // Consistent speed
-                opacity: 0.3,
-                letters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789'.split('')
+    static initHeroEffect() {
+        const container = document.getElementById('matrixBg');
+        if (container) {
+            this.effects.hero = new MatrixEffect(container, {
+                fontSize: 14,
+                color: '#00ff88',
+                speed: 80,
+                opacity: 0.55,
+                letters: '01アィゥェォカサタナハマヤラワ0123456789'.split('')
             });
-        } else {
-            console.warn(`Project ${index + 1} matrix container not found`);
-        }
-    });
-
-    // Rocket element animasyonu (tech-circle)
-    const techCircle = document.querySelector('.tech-circle');
-    if (techCircle) {
-        console.log('Creating rocket matrix effect');
-        // Create matrix container inside tech-circle
-        const matrixContainer = document.createElement('div');
-        matrixContainer.style.position = 'absolute';
-        matrixContainer.style.top = '0';
-        matrixContainer.style.left = '0';
-        matrixContainer.style.width = '100%';
-        matrixContainer.style.height = '100%';
-        matrixContainer.style.borderRadius = '50%';
-        matrixContainer.style.overflow = 'hidden';
-        matrixContainer.style.zIndex = '1';
-        
-        techCircle.style.position = 'relative';
-        techCircle.appendChild(matrixContainer);
-        
-        // Move the rocket icon to front
-        const rocketIcon = techCircle.querySelector('i');
-        if (rocketIcon) {
-            rocketIcon.style.position = 'relative';
-            rocketIcon.style.zIndex = '2';
-        }
-        
-        // Create rocket matrix effect
-        window.matrixEffects.rocket = createMatrixEffect(matrixContainer, {
-            fontSize: 10,
-            color: '#fff',
-            speed: 40,
-            opacity: 0.3,
-            clipToCircle: true
-        });
-        
-        // Add hover effect to tech-circle
-        techCircle.addEventListener('mouseenter', () => {
-            if (window.matrixEffects.rocket && window.matrixEffects.rocket.changeSpeed) {
-                window.matrixEffects.rocket.changeSpeed(15); // Much faster on hover
-            }
-        });
-        
-        techCircle.addEventListener('mouseleave', () => {
-            if (window.matrixEffects.rocket && window.matrixEffects.rocket.changeSpeed) {
-                window.matrixEffects.rocket.changeSpeed(40); // Back to normal speed
-            }
-        });
-    } else {
-        console.warn('Tech circle not found');
-    }
-    
-    console.log('Matrix effects initialization complete');
-}
-
-
-
-// Cleanup function for matrix effects
-function cleanupMatrixEffects() {
-    if (window.matrixEffects) {
-        Object.values(window.matrixEffects).forEach(effect => {
-            if (effect && effect.cleanup) {
-                effect.cleanup();
-            }
-        });
-        window.matrixEffects = null;
-    }
-    
-
-}
-
-// Mobile Menu Toggle
-function toggleMobileMenu() {
-    const hamburger = document.querySelector('.hamburger');
-    const navMenu = document.querySelector('.nav-menu');
-    
-    if (hamburger && navMenu) {
-        hamburger.classList.toggle('active');
-        navMenu.classList.toggle('active');
-    }
-}
-
-// Smooth Scrolling for Navigation Links
-function smoothScrollTo(targetId) {
-    const target = document.querySelector(targetId);
-    if (target) {
-        const offsetTop = target.offsetTop - 70; // Account for fixed navbar
-        window.scrollTo({
-            top: offsetTop,
-            behavior: 'smooth'
-        });
-    }
-}
-
-// Navbar Background Change on Scroll
-function handleNavbarScroll() {
-    const navbar = document.querySelector('.navbar');
-    if (navbar) {
-        if (window.scrollY > 100) {
-            navbar.style.background = 'rgba(18, 18, 18, 0.98)';
-        } else {
-            navbar.style.background = 'rgba(18, 18, 18, 0.95)';
         }
     }
-}
-
-// Animate Elements on Scroll
-function animateOnScroll() {
-    const elements = document.querySelectorAll('.feature, .project-card, .testimonial, .stat');
     
-    elements.forEach(element => {
-        const elementTop = element.getBoundingClientRect().top;
-        const elementVisible = 150;
-        
-        if (elementTop < window.innerHeight - elementVisible) {
-            element.style.opacity = '1';
-            element.style.transform = 'translateY(0)';
+    static initFooterEffect() {
+        const container = document.getElementById('matrixBgFooter');
+        if (container) {
+            this.effects.footer = new MatrixEffect(container, {
+                fontSize: 14,
+                color: '#00ff88',
+                speed: 60,
+                opacity: 0.4
+            });
         }
-    });
-}
-
-// Form Submission Handler
-function handleFormSubmission(event) {
-    event.preventDefault();
+    }
     
-    const form = event.target;
-    const formData = new FormData(form);
+    static initVideoEffect() {
+        const container = document.getElementById('matrixBgVideo');
+        if (container) {
+            this.effects.video = new MatrixEffect(container, {
+                fontSize: 12,
+                color: '#00ff88',
+                speed: 60,
+                opacity: 0.4,
+                letters: '01アィゥェォカサタナハマヤラワ0123456789'.split('')
+            });
+        }
+    }
     
-    // Simulate form submission
-    const submitButton = form.querySelector('button[type="submit"]');
-    const originalText = submitButton.textContent;
-    
-    submitButton.textContent = 'Gönderiliyor...';
-    submitButton.disabled = true;
-    
-    setTimeout(() => {
-        alert('Mesajınız başarıyla gönderildi! En kısa sürede size dönüş yapacağız.');
-        form.reset();
-        submitButton.textContent = originalText;
-        submitButton.disabled = false;
-    }, 2000);
-}
-
-// Counter Animation for Stats
-function animateCounters() {
-    const counters = document.querySelectorAll('.stat-number');
-    
-    counters.forEach(counter => {
-        const target = parseInt(counter.textContent);
-        const increment = target / 100;
-        let current = 0;
+    static initProjectEffects() {
+        const projectColors = ['#d1fae5', '#dbeafe', '#ede9fe', '#cffafe'];
         
-        const updateCounter = () => {
-            if (current < target) {
-                current += increment;
-                counter.textContent = Math.ceil(current) + '+';
-                setTimeout(updateCounter, 20);
-            } else {
-                counter.textContent = target + '+';
+        for (let i = 1; i <= 4; i++) {
+            const container = document.getElementById(`matrixBgProject${i}`);
+            if (container) {
+                this.effects[`project${i}`] = new MatrixEffect(container, {
+                    fontSize: 10,
+                    color: projectColors[i - 1] || '#ffffff',
+                    speed: 80,
+                    opacity: 0.22
+                });
             }
+        }
+    }
+    
+    static cleanup() {
+        Object.values(this.effects).forEach(effect => {
+            if (effect && effect.destroy) {
+                effect.destroy();
+            }
+        });
+        this.effects = {};
+    }
+}
+
+// ============================================================================
+// CAROUSEL MANAGER
+// ============================================================================
+
+class CarouselManager {
+    static initTeamCarousel() {
+        console.log('=== CAROUSEL INIT START ===');
+        
+        const slider = document.querySelector('.team-slider');
+        console.log('Slider found:', slider);
+        
+        const slides = document.querySelectorAll('.team-slide');
+        console.log('Slides found:', slides.length);
+        
+        const prevBtn = document.querySelector('.team-arrow.prev-arrow');
+        console.log('Prev button found:', prevBtn);
+        
+        const nextBtn = document.querySelector('.team-arrow.next-arrow');
+        console.log('Next button found:', nextBtn);
+        
+        if (!slider) {
+            console.error('Slider not found!');
+            return;
+        }
+        
+        if (!slides.length) {
+            console.error('No slides found!');
+            return;
+        }
+        
+        let currentSlide = 0;
+        const totalSlides = 11; // Manuel olarak 11 ekip üyesi
+        let autoSlideInterval;
+        
+        console.log('Total slides:', totalSlides);
+        
+        // Responsive için görünen kart sayısını belirle
+        const getVisibleSlides = () => {
+            if (window.innerWidth <= 768) return 1; // Mobil: 1 kart
+            if (window.innerWidth <= 1024) return 2; // Tablet: 2 kart
+            return 3; // Desktop: 3 kart
         };
         
-        updateCounter();
-    });
-}
-
-// Parallax Effect for Hero Section
-function handleParallax() {
-    const scrolled = window.pageYOffset;
-    const hero = document.querySelector('.hero');
-    
-    if (hero) {
-        const rate = scrolled * -0.5;
-        hero.style.transform = `translateY(${rate}px)`;
-    }
-}
-
-// Team Carousel
-function initTeamCarousel() {
-    const slider = document.querySelector('.team-slider');
-    const slides = document.querySelectorAll('.team-slide');
-    const dotsContainer = document.querySelector('.team-dots');
-    const prevBtn = document.querySelector('.team-arrow.prev-arrow');
-    const nextBtn = document.querySelector('.team-arrow.next-arrow');
-    
-    if (!slider || !slides.length) return;
-    
-    // Clear existing dots
-    if (dotsContainer) {
-        dotsContainer.innerHTML = '';
-    }
-    
-    // Set initial state
-    let currentSlide = 0;
-    const totalSlides = slides.length;
-    
-    // Calculate visible slides based on screen width
-    function getVisibleSlides() {
-        if (window.innerWidth <= 768) return 1;
-        if (window.innerWidth <= 992) return 2;
-        if (window.innerWidth <= 1200) return 3;
-        return 4;
-    }
-    
-    let visibleSlides = getVisibleSlides();
-    
-    // Initialize slider
-    function initSlider() {
-        // Update visible slides count
-        visibleSlides = getVisibleSlides();
-        
-        // Update slide widths
-        const slideWidth = 100 / visibleSlides;
-        slides.forEach(slide => {
-            // On mobile (1 per view), use full width to avoid off-center alignment
-            if (visibleSlides === 1) {
-                slide.style.width = '100%';
+        const updateSlider = () => {
+            let slideWidth;
+            if (window.innerWidth <= 768) {
+                slideWidth = 350; // Mobil: 350px (gap yok)
+            } else if (window.innerWidth <= 1024) {
+                slideWidth = 355; // iPad: 350px + 5px gap = 355px (3 kart gözüküyor)
             } else {
-                slide.style.width = `calc(${slideWidth}% - 20px)`;
+                slideWidth = 355; // Desktop: 350px + 5px gap = 355px (değişmedi)
             }
-            slide.style.flexShrink = '0';
-        });
+            const translateX = -(currentSlide * slideWidth);
+            slider.style.transform = `translateX(${translateX}px)`;
+            console.log('UPDATE SLIDER:', { currentSlide, translateX, totalSlides, slideWidth, windowWidth: window.innerWidth });
+        };
         
-        // Update dots
-        if (dotsContainer) {
-            dotsContainer.innerHTML = '';
-            const dotCount = Math.ceil(totalSlides / visibleSlides);
-            
-            for (let i = 0; i < dotCount; i++) {
-                const dot = document.createElement('div');
-                dot.classList.add('team-dot');
-                if (i === 0) dot.classList.add('active');
-                dot.addEventListener('click', () => goToSlide(i * visibleSlides));
-                dotsContainer.appendChild(dot);
+        const nextSlide = () => {
+            console.log('NEXT CLICKED!');
+            // 3 kart gözüken yapılarda (n-3) başa dön, tek kart gözüken yapılarda son karttan sonra başa dön
+            if (window.innerWidth > 768) {
+                // Desktop ve iPad: 3 kart gözüküyor, 8. karttan sonra başa dön (11-3=8)
+                if (currentSlide >= 8) {
+                    currentSlide = 0;
+                } else {
+                    currentSlide++;
+                }
+            } else {
+                // Mobil: 1 kart gözüküyor, son karttan sonra başa dön
+                if (currentSlide >= 10) {
+                    currentSlide = 0;
+                } else {
+                    currentSlide++;
+                }
             }
-        }
-        
-        // Reset position
-        currentSlide = 0;
-        updateSlider();
-    }
-    
-    // Update slider position
-    function updateSlider() {
-        const slideWidth = 100 / visibleSlides;
-        const maxSlide = Math.max(0, totalSlides - visibleSlides);
-        currentSlide = Math.min(Math.max(currentSlide, 0), maxSlide);
-        
-        // For 1-per-view, translate exactly 100% per slide; otherwise keep percentage by count
-        const step = (visibleSlides === 1) ? 100 : (100 / visibleSlides);
-        const translateX = -(currentSlide * step);
-        slider.style.transform = `translateX(${translateX}%)`;
-        
-        // Update dots
-        if (dotsContainer) {
-            const dots = dotsContainer.querySelectorAll('.team-dot');
-            const activeDotIndex = Math.floor(currentSlide / visibleSlides);
-            
-            dots.forEach((dot, index) => {
-                dot.classList.toggle('active', index === activeDotIndex);
-            });
-        }
-    }
-    
-    // Navigation functions
-    function nextSlide() {
-        const maxSlide = Math.max(0, totalSlides - visibleSlides);
-        if (currentSlide < maxSlide) {
-            currentSlide++;
+            console.log('New current slide:', currentSlide, 'Total slides:', totalSlides);
             updateSlider();
+            resetAutoSlide();
+        };
+        
+        const prevSlide = () => {
+            console.log('PREV CLICKED!');
+            // 3 kart gözüken yapılarda (n-3) sona git, tek kart gözüken yapılarda son karta git
+            if (window.innerWidth > 768) {
+                // Desktop ve iPad: 3 kart gözüküyor, ilk karttaysa 8. karta git
+                if (currentSlide <= 0) {
+                    currentSlide = 8;
+                } else {
+                    currentSlide--;
+                }
+            } else {
+                // Mobil: 1 kart gözüküyor, ilk karttaysa son karta git
+                if (currentSlide <= 0) {
+                    currentSlide = 10;
+                } else {
+                    currentSlide--;
+                }
+            }
+            console.log('New current slide:', currentSlide);
+            updateSlider();
+            resetAutoSlide();
+        };
+        
+        if (nextBtn) {
+            nextBtn.addEventListener('click', nextSlide);
+            console.log('Next button listener added successfully');
         } else {
-            // Loop to start
-            currentSlide = 0;
-            updateSlider();
+            console.error('Next button not found!');
         }
-    }
-    
-    function prevSlide() {
-        if (currentSlide > 0) {
-            currentSlide--;
-            updateSlider();
-        } else {
-            // Loop to end
-            currentSlide = Math.max(0, totalSlides - visibleSlides);
-            updateSlider();
-        }
-    }
-    
-    // Initialize the slider
-    initSlider();
-    
-    // Event listeners
-    if (nextBtn) nextBtn.addEventListener('click', nextSlide);
-    if (prevBtn) prevBtn.addEventListener('click', prevSlide);
-    
-    // Touch events for mobile
-    let touchStartX = 0;
-    let touchEndX = 0;
-    
-    slider.addEventListener('touchstart', (e) => {
-        touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-    
-    slider.addEventListener('touchend', (e) => {
-        touchEndX = e.changedTouches[0].screenX;
-        handleSwipe();
-    }, { passive: true });
-    
-    function handleSwipe() {
-        const swipeThreshold = 50;
-        const difference = touchStartX - touchEndX;
         
-        if (Math.abs(difference) > swipeThreshold) {
-            if (difference > 0) {
+        if (prevBtn) {
+            prevBtn.addEventListener('click', prevSlide);
+            console.log('Prev button listener added successfully');
+        } else {
+            console.error('Prev button not found!');
+        }
+        
+        const startAutoSlide = () => {
+            autoSlideInterval = setInterval(() => {
                 nextSlide();
-            } else {
-                prevSlide();
+            }, 7000);
+        };
+        
+        const resetAutoSlide = () => {
+            if (autoSlideInterval) {
+                clearInterval(autoSlideInterval);
             }
-        }
-    }
-    
-    // Handle window resize
-    let resizeTimer;
-    window.addEventListener('resize', () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => {
-            initSlider();
+            startAutoSlide();
+        };
+        
+        // İlk yüklemede slider'ı sıfırla
+        updateSlider();
+        
+        // Slider'ın doğru pozisyonda başlaması için kısa bir gecikme
+        setTimeout(() => {
+            updateSlider();
         }, 100);
-    });
+        
+        // Otomatik kaydırmayı başlat
+        startAutoSlide();
+        
+
+        
+        // Responsive için resize listener ekle
+        window.addEventListener('resize', updateSlider);
+        
+        console.log('=== CAROUSEL INIT END ===');
+    }
+    
+    static initTestimonialsCarousel() {
+        const slider = document.querySelector('.testimonials-slider');
+        const slides = document.querySelectorAll('.testimonial-slide');
+        const prevBtn = document.querySelector('.slider-arrow.prev-arrow');
+        const nextBtn = document.querySelector('.slider-arrow.next-arrow');
+        
+        console.log('Initializing testimonials carousel:', {
+            slider: !!slider,
+            slidesCount: slides.length,
+            prevBtn: !!prevBtn,
+            nextBtn: !!nextBtn
+        });
+        
+        if (!slider || !slides.length) return;
+        
+        let currentSlide = 0;
+        const totalSlides = slides.length;
+        
+        // Responsive için görünen kart sayısını belirle
+        const getVisibleSlides = () => {
+            if (window.innerWidth <= 768) return 1; // Mobil: 1 kart
+            if (window.innerWidth <= 900) return 1; // iPad/Tablet: 1 kart
+            if (window.innerWidth <= 1024) return 1; // Tablet: 1 kart
+            return 2; // Desktop: 2 kart
+        };
+        
+        const updateSlider = () => {
+            const visibleSlides = getVisibleSlides();
+            const slideWidth = 100 / visibleSlides;
+            const translateX = -(currentSlide * slideWidth);
+            slider.style.transform = `translateX(${translateX}%)`;
+            
+            console.log('Slider updated:', {
+                currentSlide,
+                totalSlides,
+                visibleSlides,
+                slideWidth,
+                translateX
+            });
+        };
+        
+        const nextSlide = () => {
+            const visibleSlides = getVisibleSlides();
+            const maxSlide = Math.max(0, totalSlides - visibleSlides);
+            
+            if (currentSlide >= maxSlide) {
+                // Son kartlara ulaştıysa başa dön
+                currentSlide = 0;
+            } else {
+                currentSlide++;
+            }
+            updateSlider();
+        };
+        
+        const prevSlide = () => {
+            if (currentSlide <= 0) {
+                // İlk karttaysa sona git
+                const visibleSlides = getVisibleSlides();
+                const maxSlide = Math.max(0, totalSlides - visibleSlides);
+                currentSlide = maxSlide;
+            } else {
+                currentSlide--;
+            }
+            updateSlider();
+        };
+        
+        if (nextBtn) nextBtn.addEventListener('click', nextSlide);
+        if (prevBtn) prevBtn.addEventListener('click', prevSlide);
+        
+        // Auto slide
+        setInterval(nextSlide, 10000);
+        
+        // Responsive için resize listener
+        window.addEventListener('resize', updateSlider);
+    }
 }
 
-function initTestimonialsCarousel() {
-    const testimonialsSection = document.querySelector('#testimonials');
-    const container = testimonialsSection ? testimonialsSection.querySelector('.testimonials-container') : null;
-    const slider = testimonialsSection ? testimonialsSection.querySelector('.testimonials-slider') : null;
-    const slides = testimonialsSection ? testimonialsSection.querySelectorAll('.testimonial-slide') : [];
-    const dotsContainer = testimonialsSection ? testimonialsSection.querySelector('.slider-dots') : null;
-    const prevBtn = container ? container.querySelector('.slider-arrow.prev-arrow') : null;
-    const nextBtn = container ? container.querySelector('.slider-arrow.next-arrow') : null;
-    
-    if (!slider || !slides.length) return;
-    
-    // Slides per view (responsive)
-    function getSlidesToShow() {
-        return window.innerWidth > 992 ? 2 : 1;
-    }
-    let slidesToShow = getSlidesToShow();
-    let currentSlide = 0;
-    const totalSlides = slides.length;
-    
-    // Set initial position
-    slider.style.transform = 'translateX(0)';
-    
-    // Apply slide widths
-    function applySlideWidths() {
-        const slideWidth = 100 / slidesToShow;
-        document.querySelectorAll('.testimonial-slide').forEach(slide => {
-            slide.style.flex = `0 0 ${slideWidth}%`;
-            slide.style.minWidth = `${slideWidth}%`;
-        });
-    }
-    applySlideWidths();
-    
-    // Create dots (one dot per two slides)
-    if (dotsContainer) {
-        const dotCount = Math.ceil(slides.length / 2);
-        for (let i = 0; i < dotCount; i++) {
-            const dot = document.createElement('div');
-            dot.classList.add('dot');
-            if (i === 0) dot.classList.add('active');
-            dot.addEventListener('click', () => goToSlide(i * 2));
-            dotsContainer.appendChild(dot);
-        }
+// ============================================================================
+// UI MANAGER
+// ============================================================================
+
+class UIManager {
+    static init() {
+        this.initMobileMenu();
+        this.initSmoothScrolling();
+        this.initNavbarScroll();
+        this.initContactForm();
+        this.initWhatsAppFab();
+        this.initAnimations();
     }
     
-    // Update slide position
-    function updateSlider() {
-        const slideWidth = 100 / slidesToShow;
-        const translateX = -(currentSlide * (100 / slidesToShow));
-        slider.style.transform = `translateX(${translateX}%)`;
+    static initMobileMenu() {
+        const hamburger = document.querySelector('.hamburger');
+        const navMenu = document.querySelector('.nav-menu');
         
-        // Update dots
-        if (dotsContainer) {
-            const dots = dotsContainer.querySelectorAll('.dot');
-            dots.forEach((dot, index) => {
-                dot.classList.toggle('active', index === Math.floor(currentSlide / 2));
+        if (hamburger && navMenu) {
+            hamburger.addEventListener('click', () => {
+                hamburger.classList.toggle('active');
+                navMenu.classList.toggle('active');
+            });
+            
+            // Close menu when clicking links
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.addEventListener('click', () => {
+                    hamburger.classList.remove('active');
+                    navMenu.classList.remove('active');
+                });
             });
         }
     }
     
-    // Go to specific slide
-    function goToSlide(slideIndex) {
-        currentSlide = (slideIndex + totalSlides) % totalSlides;
-        updateSlider();
-    }
-    
-    // Next slide
-    function nextSlide() {
-        currentSlide++;
-        const maxIndex = Math.max(0, totalSlides - slidesToShow);
-        if (currentSlide > maxIndex) currentSlide = 0; // loop
-        updateSlider();
-    }
-    
-    // Previous slide
-    function prevSlide() {
-        currentSlide--;
-        const maxIndex = Math.max(0, totalSlides - slidesToShow);
-        if (currentSlide < 0) currentSlide = maxIndex; // loop
-        updateSlider();
-    }
-    
-    // Event listeners
-    if (nextBtn) nextBtn.addEventListener('click', nextSlide);
-    if (prevBtn) prevBtn.addEventListener('click', prevSlide);
-    
-    // Auto slide
-    let slideInterval = setInterval(nextSlide, 5000);
-    
-    // Pause on hover
-    const sliderContainer = document.querySelector('.testimonials-container');
-    if (sliderContainer) {
-        sliderContainer.addEventListener('mouseenter', () => {
-            clearInterval(slideInterval);
-        });
-        
-        sliderContainer.addEventListener('mouseleave', () => {
-            clearInterval(slideInterval);
-            slideInterval = setInterval(nextSlide, 5000);
+    static initSmoothScrolling() {
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = link.getAttribute('href');
+                const target = document.querySelector(targetId);
+                
+                if (target) {
+                    const offsetTop = target.offsetTop - 70;
+                    window.scrollTo({
+                        top: offsetTop,
+                        behavior: 'smooth'
+                    });
+                }
+            });
         });
     }
     
-    // Handle window resize
-    function handleResize() {
-        const newSlidesToShow = getSlidesToShow();
-        if (newSlidesToShow !== slidesToShow) {
-            slidesToShow = newSlidesToShow;
-            applySlideWidths();
-            currentSlide = 0;
-            updateSlider();
+    static initNavbarScroll() {
+        const navbar = document.querySelector('.navbar');
+        if (navbar) {
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 100) {
+                    navbar.style.background = 'rgba(18, 18, 18, 0.98)';
+                } else {
+                    navbar.style.background = 'rgba(18, 18, 18, 0.95)';
+                }
+            });
         }
     }
-    window.addEventListener('resize', handleResize);
     
-    // Touch events for mobile
-    let touchStartX = 0;
-    let touchEndX = 0;
+    static async initContactForm() {
+        const form = document.querySelector('.contact-form');
+        if (form) {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData);
+                
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const originalText = submitBtn.textContent;
+                
+                submitBtn.textContent = 'Gönderiliyor...';
+                submitBtn.disabled = true;
+                
+                // Simulate form submission
+                setTimeout(() => {
+                    alert('Mesajınız başarıyla gönderildi!');
+                    form.reset();
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                }, 1000);
+            });
+        }
+    }
     
-    slider.addEventListener('touchstart', (e) => {
-        touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-    
-    slider.addEventListener('touchend', (e) => {
-        touchEndX = e.changedTouches[0].screenX;
-        handleSwipe();
-    }, { passive: true });
-    
-    function handleSwipe() {
-        const swipeThreshold = 50;
-        const difference = touchStartX - touchEndX;
-        
-        if (Math.abs(difference) > swipeThreshold) {
-            if (difference > 0) {
-                nextSlide();
-            } else {
-                prevSlide();
+    static initWhatsAppFab() {
+        const fab = document.getElementById('whatsapp-fab');
+        if (fab) {
+            const phone = fab.getAttribute('data-phone')?.replace(/[^\d]/g, '');
+            const message = fab.getAttribute('data-message') || '';
+            
+            if (phone) {
+                const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+                fab.setAttribute('href', url);
             }
+        }
+    }
+    
+    static initAnimations() {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, { threshold: 0.1 });
+        
+        document.querySelectorAll('.feature, .project-card, .testimonial, .stat').forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(30px)';
+            el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            observer.observe(el);
+        });
+    }
+}
+
+// ============================================================================
+// RELATED PROJECTS MANAGER
+// ============================================================================
+
+class RelatedProjectsManager {
+    static init() {
+        const cards = document.querySelectorAll('.projects .project-card');
+        const relatedSection = document.getElementById('related-projects');
+        const relatedGrid = relatedSection?.querySelector('.related-grid');
+        const backBtn = relatedSection?.querySelector('#related-back-btn');
+        
+        if (!cards.length || !relatedSection || !relatedGrid) return;
+        
+        cards.forEach(card => {
+            card.addEventListener('click', async (e) => {
+                e.preventDefault();
+                
+                const serviceId = this.getServiceIdFromCard(card);
+                const headerText = card.querySelector('.project-content h3')?.textContent || '';
+                
+                if (card.classList.contains('active')) {
+                    card.classList.remove('active');
+                    relatedSection.classList.remove('open');
+                } else {
+                    cards.forEach(c => c.classList.remove('active'));
+                    card.classList.add('active');
+                    await this.loadRelatedProjects(serviceId, headerText, relatedGrid, relatedSection);
+                }
+            });
+        });
+        
+        if (backBtn) {
+            backBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const projectsSection = document.getElementById('projects');
+                if (projectsSection) {
+                    const offsetTop = projectsSection.offsetTop - 70;
+                    window.scrollTo({ top: offsetTop, behavior: 'smooth' });
+                }
+            });
+        }
+    }
+    
+    static getServiceIdFromCard(card) {
+        return card.getAttribute('data-service-id');
+    }
+    
+    static async loadRelatedProjects(serviceId, headerText, relatedGrid, relatedSection) {
+        // Statik projelerle çalış
+        console.log('Statik projeler yükleniyor...');
+        const staticProjects = this.getStaticProjects(serviceId);
+        console.log('Statik projeler:', staticProjects);
+        relatedGrid.innerHTML = staticProjects.map(project => `
+            <a href="${project.url || 'javascript:void(0)'}" class="project-card project-${project.category || 'general'}">
+                <div class="project-image">
+                    <img class="project-photo" src="${project.image || 'https://i.hizliresim.com/crbhiuk.png'}" alt="${project.title}">
+                    <div class="project-overlay"></div>
+                </div>
+                <div class="project-content">
+                    <h3>${project.title}</h3>
+                    <p>${project.description}</p>
+                </div>
+            </a>
+        `).join('');
+        
+        relatedSection.classList.add('open');
+        
+        const offsetTop = relatedSection.offsetTop - 70;
+        window.scrollTo({ top: offsetTop, behavior: 'smooth' });
+    }
+    
+    static getStaticProjects(serviceId) {
+        console.log('getStaticProjects called with serviceId:', serviceId, typeof serviceId);
+        // ServiceId'yi number'a çevir
+        const id = parseInt(serviceId);
+        console.log('Converted serviceId:', id);
+        
+        // ServiceId 1 için örnek projeler
+        if (id === 1) {
+            return [
+                {
+                    id: 1,
+                    title: "Modern E-Ticaret Platformu",
+                    description: "React ve Node.js kullanılarak geliştirilmiş tam özellikli e-ticaret web uygulaması. Kullanıcı dostu arayüz, güvenli ödeme sistemi ve admin paneli içerir.",
+                    image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80",
+                    category: "Web Geliştirme",
+                    technologies: ["React", "Node.js", "MongoDB", "Stripe"],
+                    link: "#"
+                },
+                {
+                    id: 2,
+                    title: "Kurumsal Web Sitesi",
+                    description: "Profesyonel kurumsal web sitesi. SEO optimizasyonu, hızlı yükleme süreleri ve modern tasarım ile marka değerini artıran çözüm.",
+                    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2015&q=80",
+                    category: "Web Tasarım",
+                    technologies: ["HTML5", "CSS3", "JavaScript", "WordPress"],
+                    link: "#"
+                },
+                {
+                    id: 3,
+                    title: "Blog Platformu",
+                    description: "Kişisel ve kurumsal bloglar için geliştirilmiş modern platform. Zengin içerik editörü, kategoriler ve sosyal medya entegrasyonu.",
+                    image: "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80",
+                    category: "Web Geliştirme",
+                    technologies: ["Vue.js", "Laravel", "MySQL", "Redis"],
+                    link: "#"
+                }
+            ];
+        }
+        
+        // ServiceId 2 için örnek projeler
+        if (id === 2) {
+            return [
+                {
+                    id: 4,
+                    title: "Mobil Uygulama",
+                    description: "iOS ve Android için geliştirilmiş cross-platform mobil uygulama. Flutter framework kullanılarak hızlı ve performanslı çözüm.",
+                    image: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80",
+                    category: "Mobil Geliştirme",
+                    technologies: ["Flutter", "Dart", "Firebase", "REST API"],
+                    link: "#"
+                },
+                {
+                    id: 5,
+                    title: "Fitness Takip Uygulaması",
+                    description: "Kişisel fitness hedeflerini takip eden mobil uygulama. Egzersiz planları, beslenme takibi ve ilerleme raporları.",
+                    image: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80",
+                    category: "Mobil Geliştirme",
+                    technologies: ["React Native", "Node.js", "MongoDB", "Push Notifications"],
+                    link: "#"
+                },
+                {
+                    id: 6,
+                    title: "E-Ticaret Mobil Uygulaması",
+                    description: "Mobil e-ticaret deneyimi için özel olarak tasarlanmış uygulama. Hızlı alışveriş, güvenli ödeme ve kişiselleştirilmiş öneriler.",
+                    image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80",
+                    category: "Mobil Geliştirme",
+                    technologies: ["Swift", "Kotlin", "Firebase", "Stripe"],
+                    link: "#"
+                }
+            ];
+        }
+        
+        // ServiceId 3 için örnek projeler
+        if (id === 3) {
+            return [
+                {
+                    id: 7,
+                    title: "Veri Analizi Dashboard",
+                    description: "Gerçek zamanlı veri analizi ve raporlama dashboard'u. Kullanıcı dostu arayüz ile karmaşık verileri anlaşılır hale getiren çözüm.",
+                    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80",
+                    category: "Veri Analizi",
+                    technologies: ["Python", "Django", "Chart.js", "PostgreSQL"],
+                    link: "#"
+                },
+                {
+                    id: 8,
+                    title: "Makine Öğrenmesi Modeli",
+                    description: "Müşteri davranışlarını analiz eden makine öğrenmesi modeli. Tahmin algoritmaları ve otomatik raporlama sistemi.",
+                    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80",
+                    category: "Veri Analizi",
+                    technologies: ["Python", "Scikit-learn", "TensorFlow", "Jupyter"],
+                    link: "#"
+                },
+                {
+                    id: 9,
+                    title: "İş Zekası Raporlama",
+                    description: "Kurumsal iş zekası ve raporlama sistemi. KPI takibi, performans analizi ve stratejik karar destek sistemi.",
+                    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80",
+                    category: "Veri Analizi",
+                    technologies: ["Power BI", "Tableau", "SQL Server", "Azure"],
+                    link: "#"
+                }
+            ];
+        }
+        
+        // ServiceId 4 için örnek projeler
+        if (id === 4) {
+            return [
+                {
+                    id: 10,
+                    title: "Dijital Pazarlama Kampanyası",
+                    description: "Sosyal medya ve Google Ads entegrasyonu ile kapsamlı dijital pazarlama kampanyası. Hedef kitle analizi ve ROI optimizasyonu.",
+                    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2015&q=80",
+                    category: "Dijital Pazarlama",
+                    technologies: ["Google Ads", "Facebook Ads", "Instagram", "Analytics"],
+                    link: "#"
+                },
+                {
+                    id: 11,
+                    title: "SEO Optimizasyonu",
+                    description: "Arama motoru optimizasyonu ile web sitesi trafiğini artıran kapsamlı SEO çalışması. Anahtar kelime analizi ve içerik stratejisi.",
+                    image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80",
+                    category: "SEO",
+                    technologies: ["Google Analytics", "Search Console", "Keyword Research", "Content Marketing"],
+                    link: "#"
+                },
+                {
+                    id: 12,
+                    title: "İçerik Pazarlama Stratejisi",
+                    description: "Blog, video ve sosyal medya içerikleri ile marka bilinirliğini artıran kapsamlı içerik pazarlama stratejisi.",
+                    image: "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80",
+                    category: "İçerik Pazarlama",
+                    technologies: ["WordPress", "YouTube", "LinkedIn", "Email Marketing"],
+                    link: "#"
+                }
+            ];
+        }
+        
+        // ServiceId 5 için örnek projeler
+        if (id === 5) {
+            return [
+                {
+                    id: 13,
+                    title: "Grafik Tasarım Projesi",
+                    description: "Marka kimliği ve kurumsal kimlik tasarımı. Logo, kartvizit, broşür ve sosyal medya görselleri tasarımı.",
+                    image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80",
+                    category: "Grafik Tasarım",
+                    technologies: ["Adobe Photoshop", "Adobe Illustrator", "InDesign", "Figma"],
+                    link: "#"
+                },
+                {
+                    id: 14,
+                    title: "UI/UX Tasarım",
+                    description: "Kullanıcı deneyimi odaklı arayüz tasarımı. Wireframe, prototip ve kullanıcı testleri ile optimize edilmiş tasarım.",
+                    image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80",
+                    category: "UI/UX",
+                    technologies: ["Figma", "Sketch", "Adobe XD", "InVision"],
+                    link: "#"
+                },
+                {
+                    id: 15,
+                    title: "Web Sitesi Tasarımı",
+                    description: "Modern ve responsive web sitesi tasarımı. Kullanıcı deneyimi odaklı, SEO dostu ve hızlı yüklenen tasarım.",
+                    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2015&q=80",
+                    category: "Web Tasarım",
+                    technologies: ["Figma", "Adobe XD", "Sketch", "InVision"],
+                    link: "#"
+                }
+            ];
+        }
+        
+        // ServiceId 6 için örnek projeler
+        if (id === 6) {
+            return [
+                {
+                    id: 16,
+                    title: "Sistem Entegrasyonu",
+                    description: "Farklı sistemler arası veri entegrasyonu ve API geliştirme. Otomatik veri senkronizasyonu ve raporlama sistemi.",
+                    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80",
+                    category: "Sistem Entegrasyonu",
+                    technologies: ["REST API", "SOAP", "JSON", "XML"],
+                    link: "#"
+                },
+                {
+                    id: 17,
+                    title: "Bulut Çözümleri",
+                    description: "AWS, Azure ve Google Cloud platformları üzerinde bulut tabanlı çözümler. Ölçeklenebilir ve güvenli altyapı.",
+                    image: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80",
+                    category: "Bulut Çözümleri",
+                    technologies: ["AWS", "Azure", "Google Cloud", "Docker"],
+                    link: "#"
+                },
+                {
+                    id: 18,
+                    title: "DevOps Otomasyonu",
+                    description: "Sürekli entegrasyon ve sürekli dağıtım (CI/CD) pipeline'ları. Otomatik test, build ve deployment süreçleri.",
+                    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80",
+                    category: "DevOps",
+                    technologies: ["Jenkins", "GitLab CI", "Docker", "Kubernetes"],
+                    link: "#"
+                }
+            ];
+        }
+        
+        // Diğer serviceId'ler için boş döndür
+        return [];
+    }
+}
+
+// ============================================================================
+// VIDEO MANAGER
+// ============================================================================
+
+class VideoManager {
+    static init() {
+        this.loadVideo();
+    }
+    
+    static async loadVideo() {
+        // Sabit video kullan
+        this.updateVideo('https://www.youtube.com/embed/dQw4w9WgXcQ?rel=0&color=white&modestbranding=1&controls=1&playsinline=1');
+    }
+    
+    static updateVideo(videoUrl) {
+        const iframe = document.getElementById('youtube-video');
+        if (iframe && videoUrl) {
+            iframe.src = videoUrl;
         }
     }
 }
 
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    // Effects
-    createMatrixRain();
-    setInterval(createMatrixRain, 10000);
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Load data from backend
+    DataManager.loadAbout();
+    DataManager.loadServices();
+    DataManager.loadTeam();
+    DataManager.loadTestimonials();
+    DataManager.loadPartners();
     
-    // Initialize matrix effects
-    initializeMatrixEffects();
-
-    // Carousels
-    initTestimonialsCarousel();
-    initTeamCarousel();
-
-    // WhatsApp FAB
-    initWhatsAppFab();
-
-    // Mobile menu
-    const hamburger = document.querySelector('.hamburger');
-    if (hamburger) {
-        hamburger.addEventListener('click', toggleMobileMenu);
-    }
-
-    // Navigation links
-    const navLinks = document.querySelectorAll('.nav-link');
-    navLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const targetId = link.getAttribute('href');
-            smoothScrollTo(targetId);
-
-            // Close mobile menu if open
-            const navMenu = document.querySelector('.nav-menu');
-            const hamburger = document.querySelector('.hamburger');
-            if (navMenu && navMenu.classList.contains('active')) {
-                navMenu.classList.remove('active');
-                hamburger.classList.remove('active');
-            }
-        });
-    });
-
-    // Contact form
-    const contactForm = document.querySelector('.contact-form');
-    if (contactForm) {
-        contactForm.addEventListener('submit', handleFormSubmission);
-    }
-
-    // Initialize animations
-    const animatedElements = document.querySelectorAll('.feature, .project-card, .testimonial, .stat');
-    animatedElements.forEach(element => {
-        element.style.opacity = '0';
-        element.style.transform = 'translateY(30px)';
-        element.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-    });
-
-    // Initial animations
+    // Initialize UI components
+    UIManager.init();
+    MatrixManager.init();
+    VideoManager.init();
+    
+    // Initialize carousel for team cards after data loads
     setTimeout(() => {
-        animateOnScroll();
+        CarouselManager.initTeamCarousel();
     }, 500);
 });
 
-// Event listeners for scroll and resize
-window.addEventListener('scroll', () => {
-    handleNavbarScroll();
-    animateOnScroll();
-    handleParallax();
-});
-
-window.addEventListener('resize', () => {
-    createMatrixRain();
-});
-
 // Cleanup on page unload
-window.addEventListener('beforeunload', cleanupMatrixEffects);
+window.addEventListener('beforeunload', () => {
+    MatrixManager.cleanup();
+});
 
-// Intersection Observer for better performance
-const observerOptions = {
-    threshold: 0.1,
-    rootMargin: '0px 0px -50px 0px'
+// Performance optimization - throttle scroll events
+const throttle = (func, limit) => {
+    let inThrottle;
+    return function() {
+        const args = arguments;
+        const context = this;
+        if (!inThrottle) {
+            func.apply(context, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    }
 };
 
-const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-        if (entry.isIntersecting) {
-            entry.target.style.opacity = '1';
-            entry.target.style.transform = 'translateY(0)';
-        }
-    });
-}, observerOptions);
-
-// Observe elements when they're added to DOM
-document.addEventListener('DOMContentLoaded', () => {
-    const elementsToObserve = document.querySelectorAll('.feature, .project-card, .testimonial, .stat');
-    elementsToObserve.forEach(element => {
-        observer.observe(element);
-    });
-});
-
-// Add loading animation
-window.addEventListener('load', () => {
-    document.body.classList.add('loaded');
-    
-    // Animate counters when they come into view
-    const statsSection = document.querySelector('.partnership-stats');
-    if (statsSection) {
-        const statsObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    animateCounters();
-                    statsObserver.unobserve(entry.target);
-                }
-            });
-        }, { threshold: 0.5 });
-        
-        statsObserver.observe(statsSection);
-    }
-});
-
-// Add some CSS for loading state
-const style = document.createElement('style');
-style.textContent = `
-    body:not(.loaded) {
-        opacity: 0;
-        transition: opacity 0.5s ease;
-    }
-    
-    body.loaded {
-        opacity: 1;
-    }
-    
-    .feature, .project-card, .testimonial, .stat {
-        opacity: 0;
-        transform: translateY(30px);
-        transition: opacity 0.6s ease, transform 0.6s ease;
-    }
-    
-    .feature.animate, .project-card.animate, .testimonial.animate, .stat.animate {
-        opacity: 1;
-        transform: translateY(0);
-    }
-`;
-document.head.appendChild(style);
-
-// WhatsApp Floating Button initializer
-function initWhatsAppFab() {
-    const fab = document.getElementById('whatsapp-fab');
-    if (!fab) return;
-    const phone = (fab.getAttribute('data-phone') || '').replace(/[^\d]/g, '');
-    const message = fab.getAttribute('data-message') || '';
-    if (!phone) return;
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-    fab.setAttribute('href', url);
-}
-
-document.addEventListener('DOMContentLoaded', initWhatsAppFab);
+window.addEventListener('scroll', throttle(() => {
+    // Scroll handling if needed
+}, 16));

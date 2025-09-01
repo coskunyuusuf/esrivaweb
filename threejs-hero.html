@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESRiVA - 3D Hero Section</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <span class="logo-text logo-gradient">ESRiVA</span>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="#home" class="nav-link">Ana Sayfa</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#about" class="nav-link">Hakkımızda</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#projects" class="nav-link">Hizmetlerimiz</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#ourteam" class="nav-link">Ekibimiz</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#testimonials" class="nav-link">Referanslar</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#contact" class="nav-link">İletişim</a>
+                </li>
+            </ul>
+            <div class="hamburger">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section with Three.js -->
+    <section id="home" class="hero">
+        <div class="hero-container">
+            <div class="hero-background">
+                <div class="hero-overlay"></div>
+            </div>
+            
+            <!-- Three.js Canvas Container -->
+            <div id="threejs-container"></div>
+            
+            <!-- Hero Content -->
+            <div class="hero-content">
+                <div class="main-title logo-gradient">ESRiVA</div>
+                <div class="subtitle logo-gradient">YAZILIM AJANSI</div>
+                <div class="domain">www.esriva.com.tr</div>
+                <div class="hero-buttons">
+                    <a href="#projects" class="btn btn-primary">Projelerimizi Görün</a>
+                    <a href="#contact" class="btn btn-secondary">İletişime Geçin</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Projects Section -->
+    <section id="projects" class="projects">
+        <div class="container">
+            <div class="section-header">
+                <h2>Hizmetlerimiz</h2>
+                <p>Sunduğumuz hizmetler</p>
+            </div>
+            <div class="projects-grid">
+                <a href="https://example-web-development.com" target="_blank" rel="noopener noreferrer" class="project-card project-ecommerce" aria-label="Web Geliştirme hizmeti, yeni sekmede açılır">
+                    <div class="project-image">
+                        <div class="matrix-bg" id="matrixBgProject1"></div>
+                        <img class="project-photo" src="https://i.hizliresim.com/crbhiuk.png" alt="Web Geliştirme">
+                        <div class="project-overlay"></div>
+                    </div>
+                    <div class="project-content">
+                        <h3>Web Geliştirme</h3>
+                        <p>Modern ve kullanıcı dostu web siteleri tasarlıyor, geliştiriyor ve canlıya alıyoruz</p>
+                    </div>
+                </a>
+                <a href="https://example-mobile-app.com" target="_blank" rel="noopener noreferrer" class="project-card project-corporate" aria-label="Mobil Uygulama hizmeti, yeni sekmede açılır">
+                    <div class="project-image">
+                        <div class="matrix-bg" id="matrixBgProject2"></div>
+                        <img class="project-photo" src="https://i.hizliresim.com/crbhiuk.png" alt="Mobil Uygulama">
+                        <div class="project-overlay"></div>
+                    </div>
+                    <div class="project-content">
+                        <h3>Mobil Uygulama</h3>
+                        <p>iOS ve Android platformları için yenilikçi, hızlı ve etkili mobil uygulamalar yapıyoruz</p>
+                    </div>
+                </a>
+                <a href="https://example-enterprise-software.com" target="_blank" rel="noopener noreferrer" class="project-card project-mobile" aria-label="Kurumsal Yazılımlar hizmeti, yeni sekmede açılır">
+                    <div class="project-image">
+                        <div class="matrix-bg" id="matrixBgProject3"></div>
+                        <img class="project-photo" src="https://i.hizliresim.com/crbhiuk.png" alt="Kurumsal Yazılımlar">
+                        <div class="project-overlay"></div>
+                    </div>
+                    <div class="project-content">
+                        <h3>Kurumsal Yazılımlar</h3>
+                        <p>İş süreçlerinizi optimize eden, özel ve ölçeklendirilebilir yazılım çözümleri sunuyoruz</p>
+                    </div>
+                </a>
+                <a href="https://example-consulting.com" target="_blank" rel="noopener noreferrer" class="project-card project-saas" aria-label="Danışmanlık hizmeti, yeni sekmede açılır">
+                    <div class="project-image">
+                        <div class="matrix-bg" id="matrixBgProject4"></div>
+                        <img class="project-photo" src="https://i.hizliresim.com/crbhiuk.png" alt="Danışmanlık">
+                        <div class="project-overlay"></div>
+                    </div>
+                    <div class="project-content">
+                        <h3>Danışmanlık</h3>
+                        <p>Dijital dönüşüm yolculuğunuzda size rehberlik ediyor, stratejik danışmanlık hizmeti veriyoruz</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <script src="threejs-hero.js"></script>
+</body>
+</html>
