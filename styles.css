@@ -1116,7 +1116,7 @@ body {
 
 .team-slide {
     flex: 0 0 auto;
-    width: calc(33.333% - 20px);
+    width: calc(33.333% - 40px);
     transition: transform 0.3s ease;
     overflow: hidden;
     border-radius: 8px;
@@ -1220,6 +1220,17 @@ body {
     z-index: 2;
     opacity: 1;
     transition: opacity 0.3s ease;
+}
+
+.member-name {
+    z-index: 1;
+    position: absolute;
+    top: 10px;
+    left: 15px;
+    background: rgba(0, 0, 0, 0.55);
+    padding: 3px 8px;
+    border-radius: 8px;
+    transition: none !important; /* .team-member'ın transition'undan etkilenmesin */
 }
 
 .team-member:hover .member-info {
@@ -1333,7 +1344,7 @@ body {
     gap: 10px;
     position: absolute;
     bottom: 15px;
-    left: 20px;
+    right: 20px;
     z-index: 2;
     opacity: 0;
     transform: translateY(20px);
@@ -1872,7 +1883,7 @@ a.social-icon:active {
 
 .contact-info {
     flex: 1;
-    max-width: 400px;
+    width: 40%;
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -1884,7 +1895,14 @@ a.social-icon:active {
     border: 1px solid var(--border-color);
 }
 
-
+.contact-map{
+    width: 60%;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 20px var(--shadow-medium);
+    border: 1px solid var(--border-color);
+   
+}
 
 .contact-item {
     display: flex;
@@ -2066,7 +2084,7 @@ a.social-icon:active {
 
 
 
-/* System Dark Mode Preference */
+ /* System Dark Mode Preference */
 @media (prefers-color-scheme: dark) {
     :root {
         /* Colors are already dark mode optimized */
@@ -2074,9 +2092,7 @@ a.social-icon:active {
 }
 
 /* Ekibimiz text styling */
-.nav-link[href="#ourteam"] {
-    color: #ffffff !important;
-}
+
 
 /* Target the team section header specifically */
 .team .section-header h2 {
@@ -2344,3 +2360,34 @@ a.social-icon:active {
 .laptop.screen-open .workflow-item:nth-child(2) { transition-delay: 0.2s; }
 .laptop.screen-open .workflow-item:nth-child(3) { transition-delay: 0.3s; }
 .laptop.screen-open .workflow-item:nth-child(3) { transition-delay: 0.3s; }
+
+.member-role-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.member-role-badge {
+    display: inline-block;
+    background: transparent;
+    color: white;
+    padding: 6px 16px;
+    border-radius: 50px;
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    /* position: absolute; */ /* Bunu kaldır! */
+    position: static;         /* Ekle! */
+    bottom: auto;
+    left: auto;
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: all 0.3s ease;
+    margin-right: 8px;        /* Yan yana boşluk */
+    margin-bottom: 4px;       /* Alt alta boşluk */
+}

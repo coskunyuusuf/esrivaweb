@@ -458,20 +458,34 @@ class DataManager {
         container.innerHTML = allMembers.map(member => `
             <div class="team-slide" data-name="${member.name}">
                 <div class="team-member">
+
+                    <div class="member-name">
+                        <h3>${member.name}</h3>
+                    </div>
+
                     <div class="member-image">
                         <img src="${member.photo || `https://randomuser.me/api/portraits/${member.gender || 'men'}/${Math.floor(Math.random() * 99)}.jpg`}" alt="${member.name}">
                     </div>
+
                     <div class="member-info">
-                        <h3>${member.name}</h3>
-                        <div class="member-role-badge">${member.role}</div>
+                        
+                        <div class="member-role-badges">
+                            ${member.role.split(',').map(role => `
+                                <span class="member-role-badge">${role.trim()}</span>
+                            `).join('')}
+                        </div>
                         <div class="member-social">
                             ${member.linkedin ? `<a href="${member.linkedin}" class="social-icon" target="_blank"><i class="fab fa-linkedin"></i></a>` : ''}
                             ${member.email ? `<a href="mailto:${member.email}" class="social-icon"><i class="fas fa-envelope"></i></a>` : ''}
                         </div>
                     </div>
+
+                    
+
                 </div>
             </div>
         `).join('');
+        console.log('Team members rendered:', allMembers.length);
         
         CarouselManager.initTeamCarousel();
     }
@@ -697,7 +711,7 @@ class CarouselManager {
                     currentSlide--;
                 }
             } else {
-                // Mobil: 1 kart gözüküyor, ilk karttaysa son karta git
+                // Mobil: 1 kart gözüken, ilk karttaysa son karta git
                 if (currentSlide <= 0) {
                     currentSlide = 10;
                 } else {
